@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Price caches (can be large — re-downloaded automatically on first run)
+.cache/
+
+# Claude Code internal settings (machine-specific permissions)
+.claude/settings.local.json
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Environment
+.env

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MTG Purchase Optimizer</title>
+  <link rel="stylesheet" href="styles.css?v=4" />
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div>
+      <h1>MTG Purchase Optimizer</h1>
+      <div class="subtitle">Card Kingdom · Star City Games · Channel Fireball</div>
+    </div>
+    <div class="step-indicator">
+      <div class="step-dot active" id="dot-1" title="Step 1: Input"></div>
+      <div class="step-dot" id="dot-2" title="Step 2: Review"></div>
+      <div class="step-dot" id="dot-3" title="Step 3: Results"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===== STEP 1: Input ===== -->
+    <section id="step-input">
+      <div class="step-title">Paste your card list</div>
+      <div class="step-desc">One card per line. Supports most common formats.</div>
+
+      <div class="card-box">
+        <h2>Card List</h2>
+        <textarea id="card-list-input" spellcheck="false" placeholder="4 Lightning Bolt&#10;2x Sol Ring&#10;1 Black Lotus (LEA)&#10;3 Force of Will"></textarea>
+        <div class="hint">
+          Accepted formats:
+          <code>4 Lightning Bolt</code>
+          <code>4x Lightning Bolt</code>
+          <code>4 Lightning Bolt (M10)</code>
+          <code>Lightning Bolt x4</code>
+        </div>
+        <div class="actions">
+          <button class="btn-primary" id="btn-parse">Analyze Cards →</button>
+          <button class="btn-secondary" id="btn-sample">Load Sample List</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== STEP 2: Review ===== -->
+    <section id="step-review" class="hidden">
+      <div class="progress-bar-wrap">
+        <div class="progress-label">
+          <span id="progress-text">Card 1 of 0</span>
+          <span id="progress-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="review-panel">
+        <div class="panel-title">
+          <div class="panel-card-meta">
+            <span class="panel-card-name" id="card-name-display"></span>
+            <span class="panel-card-qty" id="card-qty-display"></span>
+          </div>
+          <span class="badge" id="printing-count">0 printings</span>
+        </div>
+
+        <div class="printings-table-wrap">
+          <table id="printings-table">
+            <thead>
+              <tr>
+                <th style="width:36px"></th>
+                <th style="width:52px"></th>
+                <th>Set</th>
+                <th>Year</th>
+                <th>Foil</th>
+                <th>Card Kingdom</th>
+                <th>Star City Games</th>
+                <th>Channel Fireball</th>
+                <th>TCGPlayer ref.</th>
+              </tr>
+            </thead>
+            <tbody id="printings-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="review-actions">
+          <button class="btn-secondary" id="btn-prev">← Previous</button>
+          <button class="btn-primary" id="btn-next">Accept &amp; Next →</button>
+          <button class="btn-secondary" id="btn-skip">Skip card</button>
+          <button class="btn-secondary" id="btn-back-input" style="margin-left:auto">← Back to input</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== STEP 3: Results ===== -->
+    <section id="step-results" class="hidden">
+      <div class="step-title">Recommended Carts</div>
+      <div class="step-desc">Prices are optimised to minimise total cost across accepted printings.</div>
+
+      <div class="results-summary" id="results-summary"></div>
+
+      <div id="carts-container"></div>
+      <div id="missing-container"></div>
+
+      <div class="actions" style="margin-top:24px">
+        <button class="btn-secondary" id="btn-back-review">← Back to Review</button>
+        <button class="btn-secondary" id="btn-start-over">Start Over</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="app.js?v=4"></script>
+</body>
+</html>

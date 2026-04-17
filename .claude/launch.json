@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mtg-optimizer",
+      "runtimeExecutable": "C:\\Users\\ready\\anaconda3\\python.exe",
+      "runtimeArgs": ["main.py"],
+      "port": 8000
+    }
+  ]
+}
