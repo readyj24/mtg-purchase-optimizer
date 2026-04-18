@@ -183,9 +183,19 @@ function renderPrintingsTable(cardName) {
             ${isExcluded ? '' : 'checked'} title="Include this printing" />
         </td>
         ${thumbCell}
-        <td>
+        <td class="set-cell">
           <span class="rarity-badge rarity-${rarityClass}" title="${p.rarity}"></span>
           ${escHtml(p.set_name)}${foilBadge}
+          <div class="set-id-row">
+            <span class="set-id-text">${escHtml(p.set_code)} · #${escHtml(p.collector_number)}</span>
+            <button class="edit-id-btn" data-idx="${i}" data-card="${escHtml(cardName)}" title="Override set code / collector number">✎</button>
+          </div>
+          <div class="edit-id-form hidden" data-idx="${i}">
+            <input class="edit-set-code" value="${escHtml(p.set_code)}" placeholder="SET" maxlength="8" />
+            <input class="edit-cn" value="${escHtml(p.collector_number)}" placeholder="CN" maxlength="12" />
+            <button class="edit-id-save btn-xs" data-idx="${i}" data-card="${escHtml(cardName)}">✓</button>
+            <button class="edit-id-cancel btn-xs" data-idx="${i}">✗</button>
+          </div>
         </td>
         <td>${year}</td>
         <td>${p.foil ? '✦' : ''}</td>
@@ -205,6 +215,60 @@ function renderPrintingsTable(cardName) {
       else                   excl.add(id);
       const row = e.target.closest('tr');
       row.classList.toggle('excluded', !e.target.checked);
+    });
+  });
+
+  // Attach set/CN edit listeners
+  tbody.querySelectorAll('.edit-id-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = e.target.dataset.idx;
+      tbody.querySelector(`.edit-id-form[data-idx="${idx}"]`).classList.toggle('hidden');
+    });
+  });
+
+  tbody.querySelectorAll('.edit-id-cancel').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = e.target.dataset.idx;
+      tbody.querySelector(`.edit-id-form[data-idx="${idx}"]`).classList.add('hidden');
+    });
+  });
+
+  tbody.querySelectorAll('.edit-id-save').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const { idx, card } = e.target.dataset;
+      const form = tbody.querySelector(`.edit-id-form[data-idx="${idx}"]`);
+      const newSetCode = form.querySelector('.edit-set-code').value.trim().toUpperCase();
+      const newCn = form.querySelector('.edit-cn').value.trim();
+      if (!newSetCode || !newCn) return;
+
+      const row = state.printingsCache[card][parseInt(idx)];
+      row.printing.set_code = newSetCode;
+      row.printing.collector_number = newCn;
+      row.store_prices = null; // trigger re-fetch spinner
+
+      renderPrintingsTable(card);
+
+      // Re-fetch prices with the new set code / collector number
+      const p = row.printing;
+      api('/api/prices', 'POST', {
+        card_name: p.card_name,
+        set_code:  p.set_code,
+        set_name:  p.set_name,
+        collector_number: p.collector_number,
+        foil: p.foil,
+      }).then(data => {
+        row.store_prices = [
+          { ...data.card_kingdom,     store_id: 'card_kingdom',     store_name: 'Card Kingdom' },
+          { ...data.star_city_games,  store_id: 'star_city_games',  store_name: 'Star City Games' },
+          { ...data.channel_fireball, store_id: 'channel_fireball', store_name: 'Channel Fireball' },
+        ];
+      }).catch(() => {
+        row.store_prices = [];
+      }).finally(() => {
+        if (state.step === 2 && state.parsedCards[state.currentIndex]?.card_name === card) {
+          renderPrintingsTable(card);
+        }
+      });
     });
   });
 }

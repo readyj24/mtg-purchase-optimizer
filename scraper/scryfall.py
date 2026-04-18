@@ -92,6 +92,18 @@ async def search_all_printings(card_name: str) -> list[CardPrinting]:
             else:
                 url = None
 
+    # Deduplicate: keep first occurrence of each (set_code, collector_number, foil) triplet.
+    # Scryfall occasionally returns the same physical printing more than once
+    # (e.g. multi-variant sets).
+    seen: set[tuple] = set()
+    unique: list[CardPrinting] = []
+    for p in printings:
+        key = (p.set_code, p.collector_number, p.foil)
+        if key not in seen:
+            seen.add(key)
+            unique.append(p)
+    printings = unique
+
     _printing_cache[cache_key] = printings
     return printings
 
