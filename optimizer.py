@@ -17,9 +17,10 @@ Future enhancements could include:
 from models import CartItem, OptimizeRequest, OptimizeResult
 
 STORE_NAMES = {
-    "card_kingdom": "Card Kingdom",
+    "card_kingdom":    "Card Kingdom",
     "star_city_games": "Star City Games",
-    "channel_fireball": "Channel Fireball",
+    "tcgplayer":       "TCGPlayer",
+    "tcgplayer_direct": "TCGPlayer Direct",
 }
 
 

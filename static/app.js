@@ -116,7 +116,7 @@ async function loadCurrentCard() {
   $('card-name-display').textContent = card.card_name;
   $('card-qty-display').textContent  = `Need: ${card.quantity}`;
 
-  $('printings-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text2)"><div class="loading-spinner"></div> Loading printings…</td></tr>';
+  $('printings-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text2)"><div class="loading-spinner"></div> Loading printings…</td></tr>';
   $('printing-count').textContent = '…';
 
   let printings;
@@ -124,12 +124,12 @@ async function loadCurrentCard() {
     const data = await api(`/api/card/printings?name=${encodeURIComponent(card.card_name)}`);
     printings = data.printings;
   } catch (e) {
-    $('printings-tbody').innerHTML = `<tr><td colspan="8" class="error-text" style="padding:16px">Failed to load printings: ${e.message}</td></tr>`;
+    $('printings-tbody').innerHTML = `<tr><td colspan="10" class="error-text" style="padding:16px">Failed to load printings: ${e.message}</td></tr>`;
     return;
   }
 
   if (!printings.length) {
-    $('printings-tbody').innerHTML = `<tr><td colspan="8" style="padding:16px;color:var(--text2)">No printings found.</td></tr>`;
+    $('printings-tbody').innerHTML = `<tr><td colspan="10" style="padding:16px;color:var(--text2)">No printings found.</td></tr>`;
     return;
   }
 
@@ -162,10 +162,11 @@ function getSortKey(row, col) {
     case 'set':  return p.set_name.toLowerCase();
     case 'year': return p.released_at || '';
     case 'foil': return p.foil ? 1 : 0;
-    case 'ck':   return getStorePrice('card_kingdom');
-    case 'scg':  return getStorePrice('star_city_games');
-    case 'cfb':  return getStorePrice('channel_fireball');
-    case 'tcg':  return p.tcg_price ?? Infinity;
+    case 'ck':     return getStorePrice('card_kingdom');
+    case 'scg':    return getStorePrice('star_city_games');
+    case 'tcg':    return getStorePrice('tcgplayer');
+    case 'direct': return getStorePrice('tcgplayer_direct');
+    case 'tcgref': return p.tcg_price ?? Infinity;
     default:     return 0;
   }
 }
@@ -228,7 +229,7 @@ function renderPrintingsTable(cardName) {
   const tbody = $('printings-tbody');
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="padding:16px;color:var(--text2)">No printings found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:16px;color:var(--text2)">No printings found.</td></tr>';
     return;
   }
 
@@ -249,10 +250,11 @@ function renderPrintingsTable(cardName) {
          </td>`
       : '<td></td>';
 
-    const ckCell   = priceCell(row.store_prices, 'card_kingdom');
-    const scgCell  = priceCell(row.store_prices, 'star_city_games');
-    const cfbCell  = priceCell(row.store_prices, 'channel_fireball');
-    const tcgCell  = p.tcg_price != null ? `<span class="price-cell">$${p.tcg_price.toFixed(2)}</span>` : '<span class="price-cell unavail">—</span>';
+    const ckCell      = priceCell(row.store_prices, 'card_kingdom');
+    const scgCell     = priceCell(row.store_prices, 'star_city_games');
+    const tcgMktCell  = priceCell(row.store_prices, 'tcgplayer');
+    const tcgDirCell  = priceCell(row.store_prices, 'tcgplayer_direct');
+    const tcgRefCell  = p.tcg_price != null ? `<span class="price-cell">$${p.tcg_price.toFixed(2)}</span>` : '<span class="price-cell unavail">—</span>';
 
     return `
       <tr class="${isExcluded ? 'excluded' : ''}" data-id="${escHtml(sid)}">
@@ -280,8 +282,9 @@ function renderPrintingsTable(cardName) {
         <td>${p.foil ? '✦' : ''}</td>
         <td>${ckCell}</td>
         <td>${scgCell}</td>
-        <td>${cfbCell}</td>
-        <td>${tcgCell}</td>
+        <td>${tcgMktCell}</td>
+        <td>${tcgDirCell}</td>
+        <td>${tcgRefCell}</td>
       </tr>`;
   }).join('');
 
@@ -341,9 +344,10 @@ function renderPrintingsTable(cardName) {
         foil: p.foil,
       }).then(data => {
         row.store_prices = [
-          { ...data.card_kingdom,     store_id: 'card_kingdom',     store_name: 'Card Kingdom' },
-          { ...data.star_city_games,  store_id: 'star_city_games',  store_name: 'Star City Games' },
-          { ...data.channel_fireball, store_id: 'channel_fireball', store_name: 'Channel Fireball' },
+          { ...data.card_kingdom,      store_id: 'card_kingdom',      store_name: 'Card Kingdom' },
+          { ...data.star_city_games,   store_id: 'star_city_games',   store_name: 'Star City Games' },
+          { ...data.tcgplayer,         store_id: 'tcgplayer',         store_name: 'TCGPlayer' },
+          { ...data.tcgplayer_direct,  store_id: 'tcgplayer_direct',  store_name: 'TCGPlayer Direct' },
         ];
       }).catch(() => {
         row.store_prices = [];
@@ -390,9 +394,10 @@ async function fetchAllPrices(cardName) {
           foil: p.foil,
         });
         row.store_prices = [
-          { ...data.card_kingdom,     store_id: 'card_kingdom',     store_name: 'Card Kingdom' },
-          { ...data.star_city_games,  store_id: 'star_city_games',  store_name: 'Star City Games' },
-          { ...data.channel_fireball, store_id: 'channel_fireball', store_name: 'Channel Fireball' },
+          { ...data.card_kingdom,      store_id: 'card_kingdom',      store_name: 'Card Kingdom' },
+          { ...data.star_city_games,   store_id: 'star_city_games',   store_name: 'Star City Games' },
+          { ...data.tcgplayer,         store_id: 'tcgplayer',         store_name: 'TCGPlayer' },
+          { ...data.tcgplayer_direct,  store_id: 'tcgplayer_direct',  store_name: 'TCGPlayer Direct' },
         ];
       } catch {
         row.store_prices = [];
@@ -422,7 +427,7 @@ function cheapestRowPrice(row) {
 
 function highlightBestPrices(cardName) {
   const rows = state.printingsCache[cardName] || [];
-  const stores = ['card_kingdom', 'star_city_games', 'channel_fireball'];
+  const stores = ['card_kingdom', 'star_city_games', 'tcgplayer', 'tcgplayer_direct'];
 
   // Build a map from scryfall_id -> row for O(1) lookup
   const rowById = Object.fromEntries(rows.map(r => [r.printing.scryfall_id, r]));
@@ -435,7 +440,7 @@ function highlightBestPrices(cardName) {
     });
     if (best === Infinity) return;
 
-    const colIdx = { card_kingdom: 5, star_city_games: 6, channel_fireball: 7 }[storeId];
+    const colIdx = { card_kingdom: 5, star_city_games: 6, tcgplayer: 7, tcgplayer_direct: 8 }[storeId];
     $('printings-tbody').querySelectorAll('tr').forEach(tr => {
       const sid = tr.dataset.id;
       const row = rowById[sid];

@@ -52,26 +52,39 @@ async def get_prices(
     foil: bool,
     collector_number: str = "",
 ) -> dict:
-    """Return TCGPlayer price/qty for one specific printing."""
+    """Return TCGPlayer market + Direct prices for one specific printing.
+
+    Returns {"market": {...}, "direct": {...}} so the caller can expose them
+    as two separate store columns.
+    """
     all_listings = await _get_all_for_card(card_name)
     match = _find_match(all_listings, set_name, collector_number, foil)
 
     if match:
-        return {
+        market = {
             "price":     match["price"],
             "quantity":  match["quantity"],
             "url":       match["url"],
             "condition": "NM",
             "error":     None if match["price"] is not None else "Out of stock",
         }
+        direct = {
+            "price":     match["direct_price"],
+            "quantity":  None,   # TCGPlayer Direct doesn't surface qty in search
+            "url":       match["url"],
+            "condition": "NM",
+            "error":     None if match["direct_price"] is not None else "Not available via Direct",
+        }
+        return {"market": market, "direct": direct}
 
-    return {
+    not_found = {
         "price":    None,
         "quantity": None,
         "url":      search_url(card_name),
         "condition": None,
         "error":    "Not listed on TCGPlayer",
     }
+    return {"market": not_found, "direct": not_found}
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +168,7 @@ def _parse(data: dict, card_name: str) -> list[dict]:
         foil_only: bool = bool(product.get("foilOnly") or False)
         set_name_tcg: str = product.get("setName") or ""
 
-        # Price: prefer marketPrice (recent-sales market, reflects NM value),
+        # Market price: prefer marketPrice (recent-sales, reflects NM value),
         # fall back to lowestPrice (can be $0.01 for damaged/penny listings).
         price_val: Optional[float] = None
         market = product.get("marketPrice")
@@ -168,6 +181,16 @@ def _parse(data: dict, card_name: str) -> list[dict]:
         if price_val is None and lowest is not None:
             try:
                 price_val = float(lowest) or None
+            except (TypeError, ValueError):
+                pass
+
+        # TCGPlayer Direct price: NM-verified stock fulfilled from TCGPlayer's
+        # own warehouse.  Exposed as directLowPrice in the search API.
+        direct_val: Optional[float] = None
+        direct_raw = product.get("directLowPrice")
+        if direct_raw is not None:
+            try:
+                direct_val = float(direct_raw) or None
             except (TypeError, ValueError):
                 pass
 
@@ -199,6 +222,7 @@ def _parse(data: dict, card_name: str) -> list[dict]:
             "set_name":         set_name_tcg,
             "foil":             foil_only,
             "price":            price_val,
+            "direct_price":     direct_val,
             "quantity":         stock,
             "url":              full_url,
         })

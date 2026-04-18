@@ -121,7 +121,7 @@ async def get_store_prices(req: dict):
     collector_number = req.get("collector_number", "")
     foil = req.get("foil", False)
 
-    ck, scg, cfb = await asyncio.gather(
+    ck, scg, tcg = await asyncio.gather(
         ck_prices(card_name, set_code, set_name, foil, collector_number),
         scg_prices(card_name, set_code, set_name, foil, collector_number),
         cfb_prices(card_name, set_code, set_name, foil, collector_number),
@@ -135,10 +135,19 @@ async def get_store_prices(req: dict):
         result["store_name"] = store_name
         return result
 
+    def _safe_tcg(result, key, store_id, store_name):
+        if isinstance(result, Exception):
+            return {"store_id": store_id, "store_name": store_name, "price": None, "quantity": None, "url": None, "error": str(result)}
+        sub = dict(result.get(key, {}))
+        sub["store_id"] = store_id
+        sub["store_name"] = store_name
+        return sub
+
     return {
-        "card_kingdom": _safe(ck, "card_kingdom", "Card Kingdom"),
+        "card_kingdom":    _safe(ck, "card_kingdom", "Card Kingdom"),
         "star_city_games": _safe(scg, "star_city_games", "Star City Games"),
-        "channel_fireball": _safe(cfb, "channel_fireball", "Channel Fireball"),
+        "tcgplayer":       _safe_tcg(tcg, "market", "tcgplayer", "TCGPlayer"),
+        "tcgplayer_direct": _safe_tcg(tcg, "direct", "tcgplayer_direct", "TCGPlayer Direct"),
     }
 
 

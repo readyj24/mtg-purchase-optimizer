@@ -16,7 +16,7 @@ class CardPrinting(BaseModel):
 
 
 class StorePrice(BaseModel):
-    store_id: str   # "card_kingdom" | "star_city_games" | "channel_fireball"
+    store_id: str   # "card_kingdom" | "star_city_games" | "tcgplayer" | "tcgplayer_direct"
     store_name: str
     price: Optional[float] = None
     quantity: Optional[int] = None
