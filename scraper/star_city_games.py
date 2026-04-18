@@ -217,21 +217,27 @@ def _find_match(
     cn = (collector_number or "").lstrip("0") or "0"
     sc = set_code.upper()
 
+    # Pass 1: exact match — set + foil + collector number
     for item in listings:
-        if item["set_code"] != sc:
-            continue
-        if item["foil"] != foil:
-            continue
-        if item["collector_number"] != cn:
-            continue
-        return item
+        if item["set_code"] == sc and item["foil"] == foil and item["collector_number"] == cn:
+            return item
 
-    # Fallback: match without collector number (some old sets don't have it)
-    for item in listings:
-        if item["set_code"] != sc:
-            continue
-        if item["foil"] != foil:
-            continue
-        return item
+    # Pass 2: try the raw collector number without stripping leading zeros,
+    # in case SCG preserves them differently
+    raw_cn = (collector_number or "").strip()
+    if raw_cn and raw_cn != cn:
+        for item in listings:
+            if item["set_code"] == sc and item["foil"] == foil and item["collector_number"] == raw_cn:
+                return item
+
+    # Pass 3: fallback by set + foil only — but ONLY when there is exactly one
+    # such listing (unambiguous old-set cards where CN isn't meaningful).
+    # When multiple versions exist, skipping CN would return the wrong card.
+    same_set_foil = [
+        item for item in listings
+        if item["set_code"] == sc and item["foil"] == foil
+    ]
+    if len(same_set_foil) == 1:
+        return same_set_foil[0]
 
     return None
