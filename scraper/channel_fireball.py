@@ -9,6 +9,16 @@ One Playwright navigation per card name fetches all TCGPlayer listings via
 the internal search API.  Results are cached in memory for the session.
 Per-printing price lookups then hit the cache instantly.
 
+Direct prices
+-------------
+The search API returns marketPrice / lowestPrice but NOT directLowPrice.
+After parsing search results we make a second in-page fetch to:
+
+    /pricing/product/{id1},{id2},...
+
+which is served from the same tcgplayer.com domain (no CORS / auth needed)
+and returns directLowPrice for each product.
+
 Matching Scryfall printings to TCGPlayer results
 -------------------------------------------------
 TCGPlayer results include:
@@ -22,9 +32,7 @@ tie-breaker when collector numbers collide across sets (rare, but possible).
 """
 
 import asyncio
-import json
 import logging
-import re
 from typing import Optional
 from urllib.parse import quote_plus
 
@@ -124,8 +132,7 @@ async def _fetch(card_name: str) -> list[dict]:
         browser = await get_browser()
         page, ctx = await new_page(browser)
         try:
-            # Use expect_response context manager — Playwright buffers the response
-            # body for us before we close the context, avoiding race conditions.
+            # Capture the internal search API response before the context closes.
             async with page.expect_response(
                 lambda r: "mp-search-api.tcgplayer.com/v1/search/request" in r.url,
                 timeout=25000,
@@ -134,7 +141,13 @@ async def _fetch(card_name: str) -> list[dict]:
 
             response = await resp_info.value
             data = await response.json()
-            return _parse(data, card_name)
+            items = _parse(data, card_name)
+
+            # Enrich items with directLowPrice via the /pricing/product endpoint.
+            # This is a same-domain fetch so the page's session handles auth.
+            await _enrich_direct_prices(page, items, card_name)
+
+            return items
         except Exception as inner_e:
             logger.warning("TCGPlayer inner error for '%s': %s", card_name, inner_e)
             return []
@@ -143,6 +156,60 @@ async def _fetch(card_name: str) -> list[dict]:
     except Exception as e:
         logger.warning("TCGPlayer fetch error for '%s': %s", card_name, e)
         return []
+
+
+async def _enrich_direct_prices(page, items: list[dict], card_name: str) -> None:
+    """Call /pricing/product/{ids} from within the page to get directLowPrice."""
+    product_ids = list({
+        item["product_id"] for item in items
+        if item.get("product_id") is not None
+    })
+    if not product_ids:
+        return
+
+    try:
+        ids_str = ",".join(str(pid) for pid in product_ids[:250])
+        result = await page.evaluate(f"""
+            async () => {{
+                const resp = await fetch('/pricing/product/{ids_str}');
+                if (!resp.ok) return null;
+                return resp.json();
+            }}
+        """)
+        if result and isinstance(result, dict):
+            _merge_pricing(items, result)
+            logger.info(
+                "TCGPlayer: direct prices fetched for '%s' (%d products)",
+                card_name, len(product_ids),
+            )
+    except Exception as e:
+        logger.warning("TCGPlayer pricing fetch failed for '%s': %s", card_name, e)
+
+
+def _merge_pricing(items: list[dict], pricing_data: dict) -> None:
+    """Merge directLowPrice from /pricing/product response into items list."""
+    price_map: dict[tuple, dict] = {}
+    for entry in pricing_data.get("results", []):
+        pid = entry.get("productId")
+        subtype = (entry.get("subTypeName") or "Normal").lower()
+        if pid is not None:
+            price_map[(int(pid), subtype)] = entry
+
+    for item in items:
+        pid = item.get("product_id")
+        if pid is None:
+            continue
+        subtype = "foil" if item["foil"] else "normal"
+        entry = price_map.get((int(pid), subtype))
+        if entry is None:
+            continue
+
+        direct_raw = entry.get("directLowPrice")
+        if direct_raw is not None:
+            try:
+                item["direct_price"] = float(direct_raw) or None
+            except (TypeError, ValueError):
+                pass
 
 
 def _parse(data: dict, card_name: str) -> list[dict]:
@@ -184,16 +251,6 @@ def _parse(data: dict, card_name: str) -> list[dict]:
             except (TypeError, ValueError):
                 pass
 
-        # TCGPlayer Direct price: NM-verified stock fulfilled from TCGPlayer's
-        # own warehouse.  Exposed as directLowPrice in the search API.
-        direct_val: Optional[float] = None
-        direct_raw = product.get("directLowPrice")
-        if direct_raw is not None:
-            try:
-                direct_val = float(direct_raw) or None
-            except (TypeError, ValueError):
-                pass
-
         # Stock: TCGPlayer doesn't expose exact stock in search results
         stock: Optional[int] = None
         total_listings = product.get("totalListings")
@@ -205,7 +262,6 @@ def _parse(data: dict, card_name: str) -> list[dict]:
 
         # Build canonical product URL.
         # Prefer the stable /product/{id} route — always works on TCGPlayer.
-        # Fall back to the slug format only when there's no product ID.
         product_id = product.get("productId")
         if product_id:
             full_url = f"{BASE_TCG}/product/{product_id}"
@@ -218,11 +274,12 @@ def _parse(data: dict, card_name: str) -> list[dict]:
                 full_url = search_url(card_name)
 
         items.append({
+            "product_id":       product_id,   # needed for /pricing/product lookup
             "collector_number": cn,
             "set_name":         set_name_tcg,
             "foil":             foil_only,
             "price":            price_val,
-            "direct_price":     direct_val,
+            "direct_price":     None,         # filled in by _enrich_direct_prices
             "quantity":         stock,
             "url":              full_url,
         })
