@@ -135,6 +135,58 @@ main { flex: 1; padding: 28px; max-width: 1300px; margin: 0 auto; width: 100%; }
   color: var(--text2);
 }
 
+/* ===== Settings (Step 1) ===== */
+.settings-section {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.settings-group { display: flex; flex-direction: column; gap: 8px; }
+.settings-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text2);
+}
+.settings-checks { display: flex; flex-wrap: wrap; gap: 12px; }
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+}
+.check-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* ===== Reoptimize bar (Step 3) ===== */
+.reoptimize-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  margin-bottom: 24px;
+}
+.reopt-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text2);
+  white-space: nowrap;
+}
+
 .btn-primary {
   background: var(--accent);
   color: #fff;

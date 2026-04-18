@@ -13,7 +13,26 @@ const state = {
   excluded: {},
   // Final selections for optimization: [{card_name, quantity, accepted_printings}]
   finalSelections: [],
+  // Persistent settings across the session
+  settings: {
+    stores: {
+      card_kingdom:    true,
+      star_city_games: true,
+      tcgplayer:       true,
+      tcgplayer_direct: true,
+    },
+    foil:    true,   // include foil printings
+    nonFoil: true,   // include non-foil printings
+  },
 };
+
+// Store definitions used to wire up checkboxes in both Step 1 and Step 3
+const STORE_DEFS = [
+  { id: 'card_kingdom',    label: 'Card Kingdom' },
+  { id: 'star_city_games', label: 'Star City Games' },
+  { id: 'tcgplayer',       label: 'TCGPlayer' },
+  { id: 'tcgplayer_direct',label: 'TCGPlayer Direct' },
+];
 
 // Current sort for the printings table: { col: 'set'|'year'|'foil'|'ck'|'scg'|'cfb'|'tcg'|null, dir: 'asc'|'desc' }
 let currentSort = { col: null, dir: 'asc' };
@@ -141,7 +160,16 @@ async function loadCurrentCard() {
     store_prices: null, // null = not yet fetched
   }));
 
-  if (!state.excluded[card.card_name]) state.excluded[card.card_name] = new Set();
+  // On first load, auto-exclude printings that don't match the foil settings.
+  // Manual checkbox overrides on revisit are preserved by the `if` guard.
+  if (!state.excluded[card.card_name]) {
+    const excl = new Set();
+    printings.forEach(p => {
+      if (p.foil  && !state.settings.foil)    excl.add(p.scryfall_id);
+      if (!p.foil && !state.settings.nonFoil) excl.add(p.scryfall_id);
+    });
+    state.excluded[card.card_name] = excl;
+  }
 
   renderPrintingsTable(card.card_name);
 
@@ -522,26 +550,51 @@ function advanceCard(delta) {
 // ---------------------------------------------------------------------------
 // Step 3: optimization & results
 // ---------------------------------------------------------------------------
+function buildFilteredSelections() {
+  const enabled = new Set(
+    Object.entries(state.settings.stores).filter(([, v]) => v).map(([k]) => k)
+  );
+  return state.finalSelections.map(sel => ({
+    ...sel,
+    accepted_printings: sel.accepted_printings.map(ap => ({
+      ...ap,
+      store_prices: ap.store_prices.filter(sp => enabled.has(sp.store_id)),
+    })),
+  }));
+}
+
+function syncResultStoreChecks() {
+  STORE_DEFS.forEach(({ id }) => {
+    const el = $(`res-store-${id}`);
+    if (el) el.checked = !!state.settings.stores[id];
+  });
+}
+
 async function runOptimization() {
   // Make sure last card is accepted if user didn't explicitly click Next
   acceptCurrentCard();
 
   goToStep(3);
+  syncResultStoreChecks();
 
-  const btn = document.createElement('div');
-  btn.style.cssText = 'text-align:center;padding:40px;color:var(--text2)';
-  btn.innerHTML = '<div class="loading-spinner"></div> Optimising cart…';
-  $('carts-container').innerHTML = '';
-  $('missing-container').innerHTML = '';
-  $('results-summary').innerHTML = '';
-  $('carts-container').appendChild(btn);
+  showOptimizingSpinner();
 
   try {
-    const result = await api('/api/optimize', 'POST', { cards: state.finalSelections });
+    const result = await api('/api/optimize', 'POST', { cards: buildFilteredSelections() });
     renderResults(result);
   } catch (e) {
     $('carts-container').innerHTML = `<div class="error-text" style="padding:20px">Optimization failed: ${e.message}</div>`;
   }
+}
+
+function showOptimizingSpinner() {
+  const spinner = document.createElement('div');
+  spinner.style.cssText = 'text-align:center;padding:40px;color:var(--text2)';
+  spinner.innerHTML = '<div class="loading-spinner"></div> Optimising cart…';
+  $('carts-container').innerHTML = '';
+  $('missing-container').innerHTML = '';
+  $('results-summary').innerHTML = '';
+  $('carts-container').appendChild(spinner);
 }
 
 function renderResults(result) {
@@ -631,6 +684,46 @@ $('btn-start-over').addEventListener('click', () => {
     printingsCache: {}, excluded: {}, finalSelections: [],
   });
   goToStep(1);
+});
+
+// ---------------------------------------------------------------------------
+// Settings wiring — Step 1 checkboxes
+// ---------------------------------------------------------------------------
+STORE_DEFS.forEach(({ id }) => {
+  const el = $(`opt-store-${id}`);
+  if (!el) return;
+  el.addEventListener('change', e => {
+    state.settings.stores[id] = e.target.checked;
+    // Keep Step 3 in sync if it's already rendered
+    const resEl = $(`res-store-${id}`);
+    if (resEl) resEl.checked = e.target.checked;
+  });
+});
+
+$('opt-foil').addEventListener('change', e => { state.settings.foil = e.target.checked; });
+$('opt-nonfoil').addEventListener('change', e => { state.settings.nonFoil = e.target.checked; });
+
+// Step 3 store checkboxes + reoptimize button
+STORE_DEFS.forEach(({ id }) => {
+  const el = $(`res-store-${id}`);
+  if (!el) return;
+  el.addEventListener('change', e => {
+    state.settings.stores[id] = e.target.checked;
+    // Keep Step 1 in sync
+    const optEl = $(`opt-store-${id}`);
+    if (optEl) optEl.checked = e.target.checked;
+  });
+});
+
+$('btn-reoptimize').addEventListener('click', async () => {
+  if (!state.finalSelections.length) return;
+  showOptimizingSpinner();
+  try {
+    const result = await api('/api/optimize', 'POST', { cards: buildFilteredSelections() });
+    renderResults(result);
+  } catch (e) {
+    $('carts-container').innerHTML = `<div class="error-text" style="padding:20px">Optimization failed: ${e.message}</div>`;
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MTG Purchase Optimizer</title>
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
 <div id="app">
@@ -38,6 +38,26 @@
           <code>4 Lightning Bolt (M10)</code>
           <code>Lightning Bolt x4</code>
         </div>
+
+        <div class="settings-section">
+          <div class="settings-group">
+            <div class="settings-label">Stores to include</div>
+            <div class="settings-checks">
+              <label class="check-label"><input type="checkbox" id="opt-store-card_kingdom"    checked> Card Kingdom</label>
+              <label class="check-label"><input type="checkbox" id="opt-store-star_city_games" checked> Star City Games</label>
+              <label class="check-label"><input type="checkbox" id="opt-store-tcgplayer"       checked> TCGPlayer</label>
+              <label class="check-label"><input type="checkbox" id="opt-store-tcgplayer_direct" checked> TCGPlayer Direct</label>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-label">Card types</div>
+            <div class="settings-checks">
+              <label class="check-label"><input type="checkbox" id="opt-nonfoil" checked> Non-foil</label>
+              <label class="check-label"><input type="checkbox" id="opt-foil"    checked> Foil</label>
+            </div>
+          </div>
+        </div>
+
         <div class="actions">
           <button class="btn-primary" id="btn-parse">Analyze Cards →</button>
           <button class="btn-secondary" id="btn-sample">Load Sample List</button>
@@ -100,6 +120,15 @@
       <div class="step-title">Recommended Carts</div>
       <div class="step-desc">Prices are optimised to minimise total cost across accepted printings.</div>
 
+      <div class="reoptimize-bar">
+        <span class="reopt-label">Stores:</span>
+        <label class="check-label"><input type="checkbox" id="res-store-card_kingdom"     checked> Card Kingdom</label>
+        <label class="check-label"><input type="checkbox" id="res-store-star_city_games"  checked> Star City Games</label>
+        <label class="check-label"><input type="checkbox" id="res-store-tcgplayer"        checked> TCGPlayer</label>
+        <label class="check-label"><input type="checkbox" id="res-store-tcgplayer_direct" checked> TCGPlayer Direct</label>
+        <button class="btn-primary" id="btn-reoptimize" style="margin-left:auto">Reoptimize →</button>
+      </div>
+
       <div class="results-summary" id="results-summary"></div>
 
       <div id="carts-container"></div>
@@ -114,6 +143,6 @@
   </main>
 </div>
 
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
