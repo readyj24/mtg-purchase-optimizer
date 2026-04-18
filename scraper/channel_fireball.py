@@ -155,18 +155,19 @@ def _parse(data: dict, card_name: str) -> list[dict]:
         foil_only: bool = bool(product.get("foilOnly") or False)
         set_name_tcg: str = product.get("setName") or ""
 
-        # Price: prefer lowestPrice NM, fall back to marketPrice
+        # Price: prefer marketPrice (recent-sales market, reflects NM value),
+        # fall back to lowestPrice (can be $0.01 for damaged/penny listings).
         price_val: Optional[float] = None
-        lowest = product.get("lowestPrice")
         market = product.get("marketPrice")
-        if lowest is not None:
-            try:
-                price_val = float(lowest) or None
-            except (TypeError, ValueError):
-                pass
-        if price_val is None and market is not None:
+        lowest = product.get("lowestPrice")
+        if market is not None:
             try:
                 price_val = float(market) or None
+            except (TypeError, ValueError):
+                pass
+        if price_val is None and lowest is not None:
+            try:
+                price_val = float(lowest) or None
             except (TypeError, ValueError):
                 pass
 

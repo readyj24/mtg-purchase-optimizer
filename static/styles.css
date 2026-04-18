@@ -314,6 +314,12 @@ tr.excluded td:first-child { opacity: 1; }
 .rarity-r { background: #c8a74f; }
 .rarity-m { background: #c85c3e; }
 
+/* Sortable column headers */
+th[data-sort] { user-select: none; white-space: nowrap; }
+th[data-sort]:hover { color: var(--text); }
+th.sort-active { color: var(--accent); }
+.sort-arrow { font-size: 10px; color: var(--accent); }
+
 .store-link { font-size: 11px; margin-left: 6px; color: var(--accent); }
 .store-link:hover { text-decoration: underline; }
 

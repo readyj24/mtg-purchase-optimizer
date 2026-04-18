@@ -15,6 +15,9 @@ const state = {
   finalSelections: [],
 };
 
+// Current sort for the printings table: { col: 'set'|'year'|'foil'|'ck'|'scg'|'cfb'|'tcg'|null, dir: 'asc'|'desc' }
+let currentSort = { col: null, dir: 'asc' };
+
 const SAMPLE_LIST = `4 Lightning Bolt
 2 Counterspell
 1 Sol Ring
@@ -146,6 +149,79 @@ async function loadCurrentCard() {
   fetchAllPrices(card.card_name);
 }
 
+// ---------------------------------------------------------------------------
+// Sort helpers
+// ---------------------------------------------------------------------------
+function getSortKey(row, col) {
+  const p = row.printing;
+  const getStorePrice = id => {
+    const sp = (row.store_prices || []).find(s => s.store_id === id);
+    return sp?.price ?? Infinity;
+  };
+  switch (col) {
+    case 'set':  return p.set_name.toLowerCase();
+    case 'year': return p.released_at || '';
+    case 'foil': return p.foil ? 1 : 0;
+    case 'ck':   return getStorePrice('card_kingdom');
+    case 'scg':  return getStorePrice('star_city_games');
+    case 'cfb':  return getStorePrice('channel_fireball');
+    case 'tcg':  return p.tcg_price ?? Infinity;
+    default:     return 0;
+  }
+}
+
+function sortedRows(rows) {
+  if (!currentSort.col) return rows;
+  const copy = [...rows];
+  copy.sort((a, b) => {
+    const ka = getSortKey(a, currentSort.col);
+    const kb = getSortKey(b, currentSort.col);
+    let cmp = 0;
+    if (ka < kb) cmp = -1;
+    else if (ka > kb) cmp = 1;
+    return currentSort.dir === 'asc' ? cmp : -cmp;
+  });
+  return copy;
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('#printings-table th[data-sort]').forEach(th => {
+    const col = th.dataset.sort;
+    th.classList.toggle('sort-active', col === currentSort.col);
+    // Remove any existing arrow spans
+    th.querySelectorAll('.sort-arrow').forEach(el => el.remove());
+    if (col === currentSort.col) {
+      const arrow = document.createElement('span');
+      arrow.className = 'sort-arrow';
+      arrow.textContent = currentSort.dir === 'asc' ? ' ▲' : ' ▼';
+      th.appendChild(arrow);
+    }
+  });
+}
+
+// Attach sort click handlers once on load
+document.querySelectorAll('#printings-table th[data-sort]').forEach(th => {
+  th.style.cursor = 'pointer';
+  th.addEventListener('click', () => {
+    const col = th.dataset.sort;
+    if (currentSort.col === col) {
+      currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort.col = col;
+      currentSort.dir = 'asc';
+    }
+    updateSortHeaders();
+    const card = state.parsedCards[state.currentIndex]?.card_name;
+    if (card) {
+      renderPrintingsTable(card);
+      highlightBestPrices(card);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Printings table rendering
+// ---------------------------------------------------------------------------
 function renderPrintingsTable(cardName) {
   const rows = state.printingsCache[cardName] || [];
   const excluded = state.excluded[cardName] || new Set();
@@ -156,9 +232,12 @@ function renderPrintingsTable(cardName) {
     return;
   }
 
-  tbody.innerHTML = rows.map((row, i) => {
+  const displayRows = sortedRows(rows);
+
+  tbody.innerHTML = displayRows.map((row) => {
     const p = row.printing;
-    const isExcluded = excluded.has(p.scryfall_id);
+    const sid = p.scryfall_id;
+    const isExcluded = excluded.has(sid);
     const year = p.released_at ? p.released_at.slice(0, 4) : '—';
     const rarityClass = { common: 'c', uncommon: 'u', rare: 'r', mythic: 'm' }[p.rarity] || 'c';
     const foilBadge = p.foil ? '<span class="foil-badge">FOIL</span>' : '';
@@ -176,10 +255,10 @@ function renderPrintingsTable(cardName) {
     const tcgCell  = p.tcg_price != null ? `<span class="price-cell">$${p.tcg_price.toFixed(2)}</span>` : '<span class="price-cell unavail">—</span>';
 
     return `
-      <tr class="${isExcluded ? 'excluded' : ''}" data-idx="${i}" data-id="${p.scryfall_id}">
+      <tr class="${isExcluded ? 'excluded' : ''}" data-id="${escHtml(sid)}">
         <td>
           <input type="checkbox" class="printing-check"
-            data-card="${escHtml(cardName)}" data-id="${p.scryfall_id}"
+            data-card="${escHtml(cardName)}" data-id="${escHtml(sid)}"
             ${isExcluded ? '' : 'checked'} title="Include this printing" />
         </td>
         ${thumbCell}
@@ -188,13 +267,13 @@ function renderPrintingsTable(cardName) {
           ${escHtml(p.set_name)}${foilBadge}
           <div class="set-id-row">
             <span class="set-id-text">${escHtml(p.set_code)} · #${escHtml(p.collector_number)}</span>
-            <button class="edit-id-btn" data-idx="${i}" data-card="${escHtml(cardName)}" title="Override set code / collector number">✎</button>
+            <button class="edit-id-btn" data-id="${escHtml(sid)}" data-card="${escHtml(cardName)}" title="Override set code / collector number">✎</button>
           </div>
-          <div class="edit-id-form hidden" data-idx="${i}">
+          <div class="edit-id-form hidden" data-id="${escHtml(sid)}">
             <input class="edit-set-code" value="${escHtml(p.set_code)}" placeholder="SET" maxlength="8" />
             <input class="edit-cn" value="${escHtml(p.collector_number)}" placeholder="CN" maxlength="12" />
-            <button class="edit-id-save btn-xs" data-idx="${i}" data-card="${escHtml(cardName)}">✓</button>
-            <button class="edit-id-cancel btn-xs" data-idx="${i}">✗</button>
+            <button class="edit-id-save btn-xs" data-id="${escHtml(sid)}" data-card="${escHtml(cardName)}">✓</button>
+            <button class="edit-id-cancel btn-xs" data-id="${escHtml(sid)}">✗</button>
           </div>
         </td>
         <td>${year}</td>
@@ -205,6 +284,8 @@ function renderPrintingsTable(cardName) {
         <td>${tcgCell}</td>
       </tr>`;
   }).join('');
+
+  updateSortHeaders();
 
   // Attach checkbox listeners
   tbody.querySelectorAll('.printing-check').forEach(cb => {
@@ -218,30 +299,32 @@ function renderPrintingsTable(cardName) {
     });
   });
 
-  // Attach set/CN edit listeners
+  // Attach set/CN edit listeners (keyed by scryfall_id, not array index)
   tbody.querySelectorAll('.edit-id-btn').forEach(btn => {
     btn.addEventListener('click', e => {
-      const idx = e.target.dataset.idx;
-      tbody.querySelector(`.edit-id-form[data-idx="${idx}"]`).classList.toggle('hidden');
+      const sid = e.target.dataset.id;
+      tbody.querySelector(`.edit-id-form[data-id="${sid}"]`).classList.toggle('hidden');
     });
   });
 
   tbody.querySelectorAll('.edit-id-cancel').forEach(btn => {
     btn.addEventListener('click', e => {
-      const idx = e.target.dataset.idx;
-      tbody.querySelector(`.edit-id-form[data-idx="${idx}"]`).classList.add('hidden');
+      const sid = e.target.dataset.id;
+      tbody.querySelector(`.edit-id-form[data-id="${sid}"]`).classList.add('hidden');
     });
   });
 
   tbody.querySelectorAll('.edit-id-save').forEach(btn => {
     btn.addEventListener('click', e => {
-      const { idx, card } = e.target.dataset;
-      const form = tbody.querySelector(`.edit-id-form[data-idx="${idx}"]`);
+      const { id: sid, card } = e.target.dataset;
+      const form = tbody.querySelector(`.edit-id-form[data-id="${sid}"]`);
       const newSetCode = form.querySelector('.edit-set-code').value.trim().toUpperCase();
       const newCn = form.querySelector('.edit-cn').value.trim();
       if (!newSetCode || !newCn) return;
 
-      const row = state.printingsCache[card][parseInt(idx)];
+      // Look up by scryfall_id (safe across sort reordering)
+      const row = (state.printingsCache[card] || []).find(r => r.printing.scryfall_id === sid);
+      if (!row) return;
       row.printing.set_code = newSetCode;
       row.printing.collector_number = newCn;
       row.store_prices = null; // trigger re-fetch spinner
@@ -341,6 +424,9 @@ function highlightBestPrices(cardName) {
   const rows = state.printingsCache[cardName] || [];
   const stores = ['card_kingdom', 'star_city_games', 'channel_fireball'];
 
+  // Build a map from scryfall_id -> row for O(1) lookup
+  const rowById = Object.fromEntries(rows.map(r => [r.printing.scryfall_id, r]));
+
   stores.forEach(storeId => {
     let best = Infinity;
     rows.forEach(row => {
@@ -349,11 +435,10 @@ function highlightBestPrices(cardName) {
     });
     if (best === Infinity) return;
 
-    // Apply to table cells (columns 4,5,6 = indexes 4,5,6)
     const colIdx = { card_kingdom: 5, star_city_games: 6, channel_fireball: 7 }[storeId];
-    const trs = $('printings-tbody').querySelectorAll('tr');
-    trs.forEach((tr, rowIdx) => {
-      const row = rows[rowIdx];
+    $('printings-tbody').querySelectorAll('tr').forEach(tr => {
+      const sid = tr.dataset.id;
+      const row = rowById[sid];
       if (!row) return;
       const sp = (row.store_prices || []).find(s => s.store_id === storeId);
       if (sp?.price === best) {
