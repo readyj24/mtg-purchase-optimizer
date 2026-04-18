@@ -26,7 +26,7 @@ import json
 import logging
 import re
 from typing import Optional
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote_plus
 
 from scraper.browser import get_browser, new_page
 from scraper.disk_cache import load as disk_load, save as disk_save
@@ -180,14 +180,19 @@ def _parse(data: dict, card_name: str) -> list[dict]:
             except (TypeError, ValueError):
                 pass
 
-        # Build canonical product URL
-        set_url = product.get("setUrlName") or ""
-        product_url = product.get("productUrlName") or ""
-        if set_url and product_url:
-            full_url = f"{BASE_TCG}/magic/{quote(set_url, safe='')}/{quote(product_url, safe='')}"
+        # Build canonical product URL.
+        # Prefer the stable /product/{id} route — always works on TCGPlayer.
+        # Fall back to the slug format only when there's no product ID.
+        product_id = product.get("productId")
+        if product_id:
+            full_url = f"{BASE_TCG}/product/{product_id}"
         else:
-            product_id = product.get("productId")
-            full_url = f"{BASE_TCG}/product/{product_id}" if product_id else search_url(card_name)
+            set_url = product.get("setUrlName") or ""
+            product_url = product.get("productUrlName") or ""
+            if set_url and product_url:
+                full_url = f"{BASE_TCG}/magic/{set_url}/{product_url}"
+            else:
+                full_url = search_url(card_name)
 
         items.append({
             "collector_number": cn,
